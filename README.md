@@ -75,16 +75,16 @@ graph TD
 
 ## Features
 
-✅ **Modular Brain Architecture** - 14 independent brain modules with specialized responsibilities
-✅ **Real-time Activity Streaming** - Watch brain modules process in real-time via WebSocket
-✅ **Azure OpenAI Integration** - Seamless GPT-4 integration with streaming support
-✅ **Orchestration Engine** - Central orchestrator that routes between modules
-✅ **Safety Enforcement** - Multiple safety layers (Medulla, Brainstem, Amygdala)
-✅ **Memory Management** - Hippocampus for conversation persistence
-✅ **Token Tracking** - Real-time token usage monitoring
-✅ **Production-Ready** - Clean architecture, error handling, logging
-✅ **Split-Screen UI** - Chat on left, brain activity on right
-✅ **Extensible** - Easily add new brain modules
+- ✅ **Modular Brain Architecture** - 14 independent brain modules with specialized responsibilities
+- ✅ **Real-time Activity Streaming** - Watch brain modules process in real-time via WebSocket
+- ✅ **Azure OpenAI Integration** - Seamless GPT-4 integration with streaming support
+- ✅ **Orchestration Engine** - Central orchestrator that routes between modules
+- ✅ **Safety Enforcement** - Multiple safety layers (Medulla, Brainstem, Amygdala)
+- ✅ **Memory Management** - Hippocampus for conversation persistence
+- ✅ **Token Tracking** - Real-time token usage monitoring
+- ✅ **Production-Ready** - Clean architecture, error handling, logging
+- ✅ **Split-Screen UI** - Chat on left, brain activity on right
+- ✅ **Extensible** - Easily add new brain modules
 
 ## Installation
 
