@@ -1,5 +1,7 @@
 # 🧠 SynapseBrain - Modular Azure OpenAI Orchestrator
 
+![SynapseBrain](main.png)
+
 A production-grade Node.js web application that simulates a modular human brain architecture for orchestrating Azure OpenAI conversations.
 
 ## Overview
