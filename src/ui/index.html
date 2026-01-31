@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 Digital Brain - Azure OpenAI Orchestrator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🧠 Digital Brain</h1>
+                <p>Modular AI Brain Architecture powered by Azure OpenAI</p>
+            </div>
+            <button id="clearBtn" class="clear-btn">Clear History</button>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Side: Chat -->
+            <section class="chat-section">
+                <div class="chat-container">
+                    <div id="chatMessages" class="chat-messages"></div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Ask the digital brain anything..."
+                        class="message-input"
+                    />
+                    <button id="sendBtn" class="send-btn">Send</button>
+                </div>
+
+                <div class="chat-info">
+                    <div class="token-usage">
+                        <span>Tokens: <span id="tokenCount">0</span></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Brain Activity Console -->
+            <section class="brain-activity-section">
+                <div class="activity-header">
+                    <h2>🧠 Brain Activity Console</h2>
+                    <button id="toggleActivity" class="toggle-btn">Collapse</button>
+                </div>
+
+                <div class="activity-container">
+                    <div id="activityLog" class="activity-log"></div>
+                </div>
+
+                <div class="module-list">
+                    <h3>Loaded Modules</h3>
+                    <div id="moduleList" class="modules"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
