@@ -3,6 +3,7 @@ export class BrainContext {
     this.userId = userId;
     this.conversationHistory = conversationHistory;
     this.memory = {};
+    this.moduleFindings = new Map();
     this.tokenUsage = {
       prompt: 0,
       completion: 0,
@@ -27,6 +28,20 @@ export class BrainContext {
     return this.memory[key];
   }
 
+  recordModuleResult(moduleName, result) {
+    // Keep synthesis data separate from execution logs and token accounting.
+    this.moduleFindings.set(moduleName, {
+      module: moduleName,
+      responsibility: result.responsibility,
+      decision: result.decision,
+      output: result.output
+    });
+  }
+
+  getModuleFindings() {
+    return Array.from(this.moduleFindings.values());
+  }
+
   recordModuleCall(moduleName) {
     this.moduleChain.push({
       module: moduleName,
@@ -45,6 +60,7 @@ export class BrainContext {
       userId: this.userId,
       conversationHistory: this.conversationHistory,
       memory: this.memory,
+      moduleFindings: this.getModuleFindings(),
       tokenUsage: this.tokenUsage,
       moduleChain: this.moduleChain
     };

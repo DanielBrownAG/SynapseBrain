@@ -192,6 +192,8 @@ Clear conversation history
 11. **Brainstem** → Stability check
 12. **Response** → Streamed to user
 
+Before synthesis, the orchestrator collects each completed module's name, responsibility, decision, and structured output in the current request context. The Cerebrum receives these findings alongside the original user request and conversation history, so specialist analysis can influence the answer. Its instructions treat findings as fallible analysis and require it to weigh conflicts and uncertainty. Findings stay out of saved conversation messages; Cerebellum refinement and the final Brainstem check run after synthesis.
+
 ### Brain Module Pattern
 
 Each module follows a strict pattern:

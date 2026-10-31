@@ -79,6 +79,7 @@ export class BrainOrchestrator {
     this.context.signal?.throwIfAborted();
     const result = await module.process(payload, this.context);
     this.context.signal?.throwIfAborted();
+    this.context.recordModuleResult(moduleName, result);
 
     // Log and broadcast
     const activity = activityTracker.logActivity(moduleName, {
