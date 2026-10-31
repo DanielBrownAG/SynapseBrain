@@ -61,7 +61,7 @@ graph TD
     J -->|Enforcement| K["🛡️ Medulla<br/>Hard Guardrails"]
     K -->|Context Management| L["🎛️ Hypothalamus<br/>System State"]
     
-    L -->|Query| M["🤖 Azure OpenAI<br/>GPT-4"]
+    L -->|Query| M["🤖 Azure OpenAI<br/>GPT-6-family"]
     M -->|Stream Response| N["📤 Response Generation<br/>Token Streaming"]
     
     N -->|WebSocket| O["💬 Browser UI<br/>Display Chat"]
@@ -79,7 +79,7 @@ graph TD
 
 - ✅ **Modular Brain Architecture** - 14 independent brain modules with specialized responsibilities
 - ✅ **Real-time Activity Streaming** - Watch brain modules process in real-time via WebSocket
-- ✅ **Azure OpenAI Integration** - Seamless GPT-4 integration with streaming support
+- ✅ **Azure OpenAI Integration** - Seamless GPT-6-family integration with streaming support
 - ✅ **Orchestration Engine** - Central orchestrator that routes between modules
 - ✅ **Safety Enforcement** - Multiple safety layers (Medulla, Brainstem, Amygdala)
 - ✅ **Memory Management** - Hippocampus for conversation persistence
@@ -91,8 +91,8 @@ graph TD
 ## Installation
 
 ### Prerequisites
-- Node.js 18+ (LTS)
-- Azure OpenAI account with GPT-4 deployment
+- Node.js 20+ (LTS)
+- Azure OpenAI account with GPT-6-family deployment
 - npm or yarn
 
 ### Setup Steps
@@ -112,8 +112,10 @@ Create `.env` file:
 ```env
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_ID=gpt-4
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_DEPLOYMENT_ID=your-gpt-6-deployment-name
+AZURE_OPENAI_API_MODE=responses
+AZURE_OPENAI_MAX_OUTPUT_TOKENS=8192
+# Optional: AZURE_OPENAI_REASONING_EFFORT=low
 PORT=3000
 NODE_ENV=development
 LOG_LEVEL=info
@@ -212,7 +214,19 @@ async process(input, context) {
 
 ## Real-Time Streaming
 
-The application uses Socket.IO for real-time brain activity streaming:
+The browser receives live model deltas through Socket.IO. Analysis and synthesis finish first; the Cerebellum then streams the refined plain-text answer as it is generated. There are no artificial typing delays. The buffered `/api/chat/chat` endpoint retains JSON refinement.
+
+Socket events are `chat-response-start`, `chat-response-chunk` (`{ chunk }`), and `chat-response-end` (success, token usage, and orchestration metadata). Stream failures emit `chat-error` and leave any partial answer visible. Disconnecting cancels the upstream request.
+
+HTTP clients can POST `{ "message": "Hello", "userId": "default" }` to `/api/chat/stream` for server-sent events named `start`, `activity`, `chunk`, `end`, and `error`. Each data payload is JSON. An `end` event carries the final result; `error` terminates an interrupted stream. For example:
+
+```bash
+curl -N http://localhost:3000/api/chat/stream -H "Content-Type: application/json" -d '{"message":"Hello"}'
+```
+
+Run `npm test` for mocked SDK, orchestration, and streaming transport checks; they do not require Azure credentials.
+
+Brain activity continues to stream as modules finish:
 
 ```javascript
 // Activities streamed to UI as they happen
@@ -281,19 +295,22 @@ Log format includes:
 ```env
 AZURE_OPENAI_ENDPOINT      # Azure OpenAI endpoint URL
 AZURE_OPENAI_API_KEY       # Azure OpenAI API key
-AZURE_OPENAI_DEPLOYMENT_ID # GPT-4 deployment ID
-AZURE_OPENAI_API_VERSION   # API version (default: 2024-02-15-preview)
+AZURE_OPENAI_DEPLOYMENT_ID # GPT-6-family deployment ID
+AZURE_OPENAI_API_MODE      # responses (default) | chat
+AZURE_OPENAI_MAX_OUTPUT_TOKENS # Positive token budget, including reasoning (default: 8192)
+AZURE_OPENAI_REASONING_EFFORT # Optional; must be supported by your deployment
 NODE_ENV                   # development | production
 PORT                       # Server port (default: 3000)
 LOG_LEVEL                  # debug | info | warn | error
 ```
 
-### Temperature Control
+### Model Compatibility
 
-Managed by Hypothalamus module based on system state:
-- Response complexity → Adjusts temperature
-- Token usage → Manages budget
-- System health → Throttles processing
+The OpenAI SDK uses the Azure v1 endpoint (`/openai/v1/`); `AZURE_OPENAI_API_VERSION` is no longer needed. Set `AZURE_OPENAI_DEPLOYMENT_ID` to the actual name of your Azure deployment. Names are passed through unchanged, allowing GPT-6 variants, snapshots, custom deployment aliases, and future models that support the selected API. Availability depends on your Azure resource and region.
+
+Responses is the default API. Set `AZURE_OPENAI_API_MODE=chat` for deployments that require Chat Completions. Sampling parameters such as temperature are omitted for reasoning-model compatibility. Reasoning effort is optional and uses the model default unless explicitly configured. Increase the output budget if generation ends with `max_output_tokens`.
+
+See the [official GPT-6 migration guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra) and [streaming guide](https://developers.openai.com/api/docs/guides/streaming-responses).
 
 ## Performance
 

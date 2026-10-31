@@ -1,6 +1,7 @@
 import logger from '../utils/logger.js';
 import activityTracker from '../utils/activityTracker.js';
 import { BrainContext } from '../utils/context.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 // Import all brain modules
 import Midbrain from './midbrain.js';
@@ -24,6 +25,11 @@ export class BrainOrchestrator {
     this.registerAllModules();
     this.conversationHistory = [];
     this.socketIO = null;
+    this.requestContext = new AsyncLocalStorage();
+  }
+
+  get context() {
+    return this.requestContext.getStore();
   }
 
   registerAllModules() {
@@ -70,7 +76,9 @@ export class BrainOrchestrator {
     }
 
     logger.info(`${callerName} calling ${moduleName}`);
+    this.context.signal?.throwIfAborted();
     const result = await module.process(payload, this.context);
+    this.context.signal?.throwIfAborted();
 
     // Log and broadcast
     const activity = activityTracker.logActivity(moduleName, {
@@ -81,14 +89,20 @@ export class BrainOrchestrator {
       nextModules: result.nextModules
     });
 
-    this.broadcastActivity(activity);
+    if (this.context.onActivity) this.context.onActivity(activity);
+    else this.broadcastActivity(activity);
     return result;
   }
 
-  async orchestrate(userInput, userId = 'default') {
+  async orchestrate(userInput, userId = 'default', options = {}) {
+    const context = new BrainContext(userId, [...this.conversationHistory]);
+    Object.assign(context, options);
+    return this.requestContext.run(context, () => this.processInput(userInput, userId));
+  }
+
+  async processInput(userInput, userId) {
     logger.info(`[ORCHESTRATION] Processing input from user: ${userId}`);
     
-    this.context = new BrainContext(userId, this.conversationHistory);
     const orchestrationLog = {
       startTime: new Date(),
       userInput: userInput.substring(0, 100),
@@ -112,6 +126,7 @@ export class BrainOrchestrator {
 
       if (medullaResult.output?.isSafe === false) {
         logger.warn('[ORCHESTRATION] Safety check failed, blocking response');
+        await this.context.onChunk?.('I cannot process that request. It violates safety guidelines.');
         return {
           success: false,
           response: 'I cannot process that request. It violates safety guidelines.',
@@ -214,6 +229,7 @@ export class BrainOrchestrator {
         tokenUsage: this.context.tokenUsage
       };
     } catch (error) {
+      if (this.context.signal?.aborted || this.context.onChunk) throw error;
       logger.error('[ORCHESTRATION] Fatal error', { error: error.message });
       return {
         success: false,

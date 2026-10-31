@@ -61,6 +61,8 @@ class DigitalBrainUI {
     });
 
     this.socket.on('chat-error', (data) => {
+      this.currentResponseElement?.classList.remove('streaming');
+      this.currentResponseElement = null;
       this.addChatMessage(`Error: ${data.error}`, 'system');
       this.isWaitingForResponse = false;
       this.sendBtn.disabled = false;
@@ -73,6 +75,13 @@ class DigitalBrainUI {
 
     this.socket.on('disconnect', () => {
       console.log('Disconnected from Brain server');
+      if (this.isWaitingForResponse) {
+        this.currentResponseElement?.classList.remove('streaming');
+        this.currentResponseElement = null;
+        this.isWaitingForResponse = false;
+        this.sendBtn.disabled = false;
+        this.addChatMessage('Connection lost. The response was interrupted; please try again.', 'system');
+      }
     });
   }
 
@@ -90,6 +99,10 @@ class DigitalBrainUI {
   async sendMessage() {
     const message = this.messageInput.value.trim();
     if (!message || this.isWaitingForResponse) return;
+    if (!this.socket.connected) {
+      this.addChatMessage('Not connected to the server. Please wait for reconnection.', 'system');
+      return;
+    }
 
     this.isWaitingForResponse = true;
     this.sendBtn.disabled = true;
@@ -176,6 +189,7 @@ class DigitalBrainUI {
   }
 
   async clearHistory() {
+    if (this.isWaitingForResponse) return;
     if (confirm('Clear all chat history and activity logs?')) {
       try {
         await fetch('/api/chat/clear', { method: 'POST' });

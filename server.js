@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import logger from './src/utils/logger.js';
 import orchestrator from './src/brain/orchestrator.js';
 import chatRoutes from './src/routes/chat.js';
+import { registerChatSocket } from './src/routes/socketChat.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,54 +48,7 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
 
-  socket.on('chat-message', async (data) => {
-    try {
-      const { message, userId = 'default' } = data;
-      
-      if (!message) {
-        socket.emit('chat-error', { error: 'Message is required' });
-        return;
-      }
-
-      logger.info(`Chat message received: ${message.substring(0, 50)}...`);
-
-      // Notify client that response is starting
-      socket.emit('chat-response-start', { message });
-
-      // Set up a temporary socket.io emitter for streaming
-      const originalBroadcast = orchestrator.broadcastActivity.bind(orchestrator);
-      orchestrator.broadcastActivity = (activity) => {
-        socket.emit('brain-activity', activity);
-      };
-
-      // Process the message
-      const result = await orchestrator.orchestrate(message, userId);
-
-      // Stream the response in chunks
-      if (result.response) {
-        const chunkSize = 10; // Characters per chunk
-        for (let i = 0; i < result.response.length; i += chunkSize) {
-          const chunk = result.response.substring(i, i + chunkSize);
-          socket.emit('chat-response-chunk', { chunk });
-          // Add small delay for visual streaming effect
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-      }
-
-      // Send final response with metadata
-      socket.emit('chat-response-end', {
-        tokenUsage: result.tokenUsage,
-        orchestrationLog: result.orchestrationLog
-      });
-
-      // Restore original broadcast function
-      orchestrator.broadcastActivity = originalBroadcast;
-
-    } catch (error) {
-      logger.error('Socket chat error', { error: error.message });
-      socket.emit('chat-error', { error: error.message });
-    }
-  });
+  registerChatSocket(socket, orchestrator);
 
   socket.on('disconnect', () => {
     logger.info(`Client disconnected: ${socket.id}`);

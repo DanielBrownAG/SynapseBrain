@@ -9,7 +9,7 @@ router.post('/chat', async (req, res) => {
   try {
     const { message, userId = 'default' } = req.body;
 
-    if (!message) {
+    if (typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({
         success: false,
         error: 'Message is required'
@@ -27,6 +27,39 @@ router.post('/chat', async (req, res) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+});
+
+// POST /api/chat/stream: model deltas and a final result over SSE.
+router.post('/stream', async (req, res) => {
+  const { message, userId = 'default' } = req.body || {};
+  if (typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ success: false, error: 'Message is required' });
+  }
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+  res.flushHeaders();
+  const send = (event, data) => {
+    if (!controller.signal.aborted) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  const heartbeat = setInterval(() => {
+    if (!controller.signal.aborted) res.write(': keep-alive\n\n');
+  }, 15000);
+  try {
+    send('start', {});
+    const result = await orchestrator.orchestrate(message, userId, {
+      signal: controller.signal,
+      onChunk: chunk => send('chunk', { chunk }),
+      onActivity: activity => send('activity', activity)
+    });
+    send('end', result);
+  } catch (error) {
+    send('error', { success: false, error: error.message });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
   }
 });
 

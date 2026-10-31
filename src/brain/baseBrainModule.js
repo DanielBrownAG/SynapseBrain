@@ -31,14 +31,26 @@ export class BaseBrainModule {
       const response = await azureOpenAI.chat(
         this.systemPrompt,
         userMessage,
-        conversationHistory
+        conversationHistory,
+        { signal: this.orchestrator?.context?.signal }
       );
+
+      this.orchestrator?.context?.updateTokenUsage(response.tokenUsage);
 
       return response;
     } catch (error) {
       logger.error(`${this.name} LLM query failed`, { error: error.message });
       throw error;
     }
+  }
+
+  async queryLLMStream(userMessage, context, systemPrompt = this.systemPrompt) {
+    const response = await azureOpenAI.chatStream(systemPrompt, userMessage, context.getHistory(), {
+      onChunk: context.onChunk,
+      signal: context.signal
+    });
+    context.updateTokenUsage(response.tokenUsage);
+    return response;
   }
 
   createOutput(reasoning, decision, nextModules = [], output = '') {

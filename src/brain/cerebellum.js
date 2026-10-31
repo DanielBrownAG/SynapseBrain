@@ -17,6 +17,14 @@ Respond with ONLY a JSON object (no markdown, no extra text):
   async process(input, context) {
     this.log('Refining output', { input: input.substring(0, 50) });
 
+    if (context.onChunk) {
+      // Stream the polished answer itself, never the internal JSON envelope.
+      // Errors propagate: after partial output, a fallback would corrupt the answer.
+      const response = await this.queryLLMStream(input, context,
+        'You are the Cerebellum of a digital brain. Improve the clarity, grammar, and coherence of the supplied response without changing its meaning. Return only the refined response as plain text, with no JSON envelope or commentary.');
+      return this.createOutput('Refined response streamed', 'Response ready', [], { refined: response.content });
+    }
+
     try {
       const response = await this.queryLLM(input, context.getHistory());
       
