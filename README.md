@@ -2,11 +2,11 @@
   <img src="assets/synapsebrain-logo.png" alt="SynapseBrain — a brain formed from connected synapse nodes" width="760">
 </p>
 
-[![Node.js >=20.3](https://img.shields.io/badge/Node.js-%3E%3D20.3-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Version](https://img.shields.io/github/package-json/v/DanielBrownAG/SynapseBrain/main)](package.json)
-[![Tests](https://img.shields.io/github/actions/workflow/status/DanielBrownAG/SynapseBrain/tests.yml?branch=main&label=tests)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/tests.yml)
-[![Dependency audit](https://img.shields.io/github/actions/workflow/status/DanielBrownAG/SynapseBrain/dependency-audit.yml?branch=main&label=dependency%20audit)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/dependency-audit.yml)
-[![Last commit](https://img.shields.io/github/last-commit/DanielBrownAG/SynapseBrain/main)](https://github.com/DanielBrownAG/SynapseBrain/commits/main/)
+[![Node.js version requirement](assets/badges/node.svg)](https://nodejs.org/)
+[![Version](assets/badges/version.svg)](package.json)
+[![Tests](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/tests.yml)
+[![Dependency audit](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/dependency-audit.yml/badge.svg?branch=main)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/dependency-audit.yml)
+[![Last commit](https://badgen.net/github/last-commit/DanielBrownAG/SynapseBrain/main)](https://github.com/DanielBrownAG/SynapseBrain/commits/main/)
 
 # SynapseBrain
 
@@ -139,6 +139,8 @@ npm audit
 Tests mock model calls and do not require Azure credentials. They cover API requests, live streaming, session persistence and isolation, output schemas, selective routing, budgets, deadlines, memory, synthesis, and safe activity rendering. HTTP tests open a temporary localhost server. Live model quality, deployment availability, latency, and token consumption must be evaluated with your own Azure deployment.
 
 GitHub Actions runs the tests on Ubuntu and Windows with Node.js 20.3.0, 22, and 24 on pushes to `main` and pull requests targeting `main`. A separate dependency audit checks production and development dependencies on those events and weekly, failing on advisories of low severity or higher. Both workflows can also be started manually from the Actions tab; neither requires Azure credentials.
+
+Node and version badges are hosted in this repository to avoid external image-proxy failures. Run `npm run badges:update` after changing `version` or `engines.node` in `package.json`; CI checks that those badges match. Workflow badges come directly from GitHub, and the live last-commit badge uses Badgen.
 
 ```text
 server.js                 Express and Socket.IO entry point

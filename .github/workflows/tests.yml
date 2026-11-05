@@ -38,3 +38,5 @@ jobs:
         run: npm ci --ignore-scripts --no-audit
       - name: Run tests
         run: npm test
+      - name: Check repository badges
+        run: node scripts/generate-badges.mjs --check
