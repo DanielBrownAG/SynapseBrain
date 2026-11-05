@@ -20,14 +20,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const flow = JSON.parse(parsed);
+      const flow = await this.queryJSON(input, context.getHistory());
 
       return this.createOutput(
         `Dialogue state: ${flow.dialogueState}`,

@@ -19,12 +19,12 @@ export class AzureOpenAIService {
     return this.client;
   }
 
-  buildRequest(systemPrompt, userMessage, conversationHistory, stream) {
+  buildRequest(systemPrompt, userMessage, conversationHistory, stream, options = {}) {
     const model = this.env.AZURE_OPENAI_DEPLOYMENT_ID;
     if (!model) throw new Error('Missing AZURE_OPENAI_DEPLOYMENT_ID');
     const mode = this.env.AZURE_OPENAI_API_MODE || 'responses';
     if (!['responses', 'chat'].includes(mode)) throw new Error('AZURE_OPENAI_API_MODE must be responses or chat');
-    const limit = Number(this.env.AZURE_OPENAI_MAX_OUTPUT_TOKENS || 8192);
+    const limit = Math.min(Number(this.env.AZURE_OPENAI_MAX_OUTPUT_TOKENS || 8192), options.maxOutputTokens ?? Infinity);
     if (!Number.isInteger(limit) || limit < 1) throw new Error('Invalid AZURE_OPENAI_MAX_OUTPUT_TOKENS');
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -55,7 +55,7 @@ export class AzureOpenAIService {
   }
 
   async chat(systemPrompt, userMessage, history = [], options = {}) {
-    const { mode, params } = this.buildRequest(systemPrompt, userMessage, history, false);
+    const { mode, params } = this.buildRequest(systemPrompt, userMessage, history, false, options);
     const client = this.getClient();
     const response = await (mode === 'responses' ? client.responses : client.chat.completions)
       .create(params, { signal: options.signal });
@@ -67,8 +67,8 @@ export class AzureOpenAIService {
     };
   }
 
-  async chatStream(systemPrompt, userMessage, history = [], { onChunk, signal } = {}) {
-    const { mode, params } = this.buildRequest(systemPrompt, userMessage, history, true);
+  async chatStream(systemPrompt, userMessage, history = [], { onChunk, signal, maxOutputTokens } = {}) {
+    const { mode, params } = this.buildRequest(systemPrompt, userMessage, history, true, { maxOutputTokens });
     const client = this.getClient();
     const stream = await (mode === 'responses' ? client.responses : client.chat.completions)
       .create(params, { signal });

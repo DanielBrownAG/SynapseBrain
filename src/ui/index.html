@@ -14,7 +14,13 @@
                 <h1>🧠 Digital Brain</h1>
                 <p>Modular AI Brain Architecture powered by Azure OpenAI</p>
             </div>
-            <button id="clearBtn" class="clear-btn">Clear History</button>
+            <div class="session-controls">
+                <label for="sessionSelect">Conversation</label>
+                <select id="sessionSelect" aria-label="Saved conversations"></select>
+                <button id="newSessionBtn" class="clear-btn">New chat</button>
+                <button id="clearBtn" class="clear-btn">Clear chat</button>
+                <button id="deleteSessionBtn" class="clear-btn">Delete chat</button>
+            </div>
         </header>
 
         <!-- Main Content -->
@@ -61,7 +67,7 @@
         </main>
     </div>
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

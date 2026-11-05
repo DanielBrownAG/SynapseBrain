@@ -19,17 +19,11 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     this.log('Processing memory', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const memory = JSON.parse(parsed);
+      const memory = await this.queryJSON(input, context.getHistory());
 
       if (memory.shouldStore) {
-        context.setMemory('lastImportant', memory.keyInformation);
+        const existing = context.getMemory('lastImportant') || [];
+        context.setMemory('lastImportant', [...new Set([...existing, ...memory.keyInformation])].slice(-100));
       }
 
       return this.createOutput(

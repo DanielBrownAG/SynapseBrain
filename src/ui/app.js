@@ -11,12 +11,105 @@ class DigitalBrainUI {
 
     this.isWaitingForResponse = false;
     this.totalTokens = 0;
+    this.sessionId = null;
+    this.sessionBusy = true;
+    this.sessionSelect = document.getElementById('sessionSelect');
+    this.newSessionBtn = document.getElementById('newSessionBtn');
+    this.deleteSessionBtn = document.getElementById('deleteSessionBtn');
     this.currentResponseElement = null;
     this.socket = null;
 
     this.initializeEventListeners();
     this.initializeSocket();
     this.loadModules();
+    this.sessionReady = this.initializeSessions();
+  }
+
+  addDetail(parent, label, value) {
+    const row = document.createElement('div');
+    row.className = 'activity-detail';
+    row.textContent = label + ': ' + String(value);
+    parent.appendChild(row);
+  }
+
+  setBusy(busy) {
+    this.sendBtn.disabled = busy;
+    this.clearBtn.disabled = busy;
+    this.newSessionBtn.disabled = busy;
+    this.deleteSessionBtn.disabled = busy;
+    this.sessionSelect.disabled = busy;
+  }
+
+  storedSessions() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('synapse-sessions') || '[]');
+      return Array.isArray(saved) ? saved.filter(id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(id)) : [];
+    } catch { return []; }
+  }
+
+  async initializeSessions() {
+    this.setBusy(true);
+    const saved = this.storedSessions();
+    const active = localStorage.getItem('synapse-active-session');
+    await this.changeSession(saved.includes(active) ? active : saved[0]);
+  }
+
+  async changeSession(id) {
+    if (this.isWaitingForResponse) return;
+    this.sessionBusy = true;
+    this.setBusy(true);
+    try {
+      if (!id) {
+        const response = await fetch('/api/chat/sessions', { method: 'POST' });
+        if (!response.ok) throw new Error('Unable to create conversation');
+        id = (await response.json()).session.id;
+      }
+      const response = await fetch('/api/chat/sessions/' + encodeURIComponent(id));
+      if (response.status === 404) {
+        localStorage.setItem('synapse-sessions', JSON.stringify(this.storedSessions().filter(saved => saved !== id)));
+        return await this.changeSession();
+      }
+      if (!response.ok) throw new Error('Unable to open conversation');
+      const { session } = await response.json();
+      this.sessionId = session.id;
+      const ids = [session.id, ...this.storedSessions().filter(saved => saved !== session.id)];
+      localStorage.setItem('synapse-sessions', JSON.stringify(ids));
+      localStorage.setItem('synapse-active-session', session.id);
+      this.sessionSelect.replaceChildren();
+      for (const saved of ids) {
+        const option = document.createElement('option');
+        option.value = saved;
+        option.textContent = 'Chat ' + saved.slice(0, 8);
+        this.sessionSelect.appendChild(option);
+      }
+      this.sessionSelect.value = session.id;
+      this.chatMessages.replaceChildren();
+      this.activityLog.replaceChildren();
+      for (const message of session.history) this.addChatMessage(message.content, message.role);
+      for (const activity of session.activities) this.addActivityItem(activity.module, activity);
+      this.totalTokens = session.totalTokens || 0;
+      this.tokenCount.textContent = this.totalTokens;
+      if (!session.history.length) this.addChatMessage('Welcome to SynapseBrain. Ask a question to see the brain modules work together.', 'assistant');
+    } catch (error) {
+      this.addChatMessage(error.message, 'system');
+    } finally {
+      this.sessionBusy = false;
+      this.setBusy(false);
+    }
+  }
+
+  async deleteSession() {
+    if (this.isWaitingForResponse || !this.sessionId || !confirm('Delete this saved conversation?')) return;
+    this.sessionBusy = true;
+    this.setBusy(true);
+    try {
+      const response = await fetch('/api/chat/sessions/' + encodeURIComponent(this.sessionId), { method: 'DELETE' });
+      if (!response.ok) throw new Error('Unable to delete conversation');
+      const remaining = this.storedSessions().filter(id => id !== this.sessionId);
+      localStorage.setItem('synapse-sessions', JSON.stringify(remaining));
+      await this.changeSession(remaining[0]);
+    } catch (error) { this.addChatMessage(error.message, 'system'); }
+    finally { this.sessionBusy = false; this.setBusy(false); }
   }
 
   initializeSocket() {
@@ -52,11 +145,11 @@ class DigitalBrainUI {
         this.tokenCount.textContent = this.totalTokens;
       }
       if (data.orchestrationLog) {
-        this.displayOrchestrationLog(data.orchestrationLog);
+        this.displayOrchestrationLog(data.orchestrationLog, data.success);
       }
       this.currentResponseElement = null;
       this.isWaitingForResponse = false;
-      this.sendBtn.disabled = false;
+      this.setBusy(false);
       this.messageInput.focus();
     });
 
@@ -65,7 +158,7 @@ class DigitalBrainUI {
       this.currentResponseElement = null;
       this.addChatMessage(`Error: ${data.error}`, 'system');
       this.isWaitingForResponse = false;
-      this.sendBtn.disabled = false;
+      this.setBusy(false);
       this.messageInput.focus();
     });
 
@@ -79,7 +172,7 @@ class DigitalBrainUI {
         this.currentResponseElement?.classList.remove('streaming');
         this.currentResponseElement = null;
         this.isWaitingForResponse = false;
-        this.sendBtn.disabled = false;
+        this.setBusy(false);
         this.addChatMessage('Connection lost. The response was interrupted; please try again.', 'system');
       }
     });
@@ -94,9 +187,14 @@ class DigitalBrainUI {
     });
 
     this.clearBtn.addEventListener('click', () => this.clearHistory());
+    this.newSessionBtn.addEventListener('click', () => this.changeSession());
+    this.deleteSessionBtn.addEventListener('click', () => this.deleteSession());
+    this.sessionSelect.addEventListener('change', () => this.changeSession(this.sessionSelect.value));
   }
 
   async sendMessage() {
+    await this.sessionReady;
+    if (this.sessionBusy || !this.sessionId) return;
     const message = this.messageInput.value.trim();
     if (!message || this.isWaitingForResponse) return;
     if (!this.socket.connected) {
@@ -105,19 +203,19 @@ class DigitalBrainUI {
     }
 
     this.isWaitingForResponse = true;
-    this.sendBtn.disabled = true;
+    this.setBusy(true);
 
     // Add user message to chat
     this.addChatMessage(message, 'user');
     this.messageInput.value = '';
 
     // Clear previous activities for this new message
-    this.activityLog.innerHTML = '';
+    this.activityLog.replaceChildren();
 
     // Send message via Socket.IO
     this.socket.emit('chat-message', { 
       message,
-      userId: 'default'
+      sessionId: this.sessionId
     });
   }
 
@@ -138,14 +236,16 @@ class DigitalBrainUI {
     moduleEl.textContent = `🧠 ${moduleName}`;
 
     const details = document.createElement('div');
-    details.innerHTML = `
-      <div class="activity-detail"><strong>Reasoning:</strong> ${activity.reasoning || 'N/A'}</div>
-      <div class="activity-detail"><strong>Decision:</strong> ${activity.decision || 'N/A'}</div>
-      ${activity.nextModules && activity.nextModules.length > 0 
-        ? `<div class="activity-detail"><strong>Next:</strong> ${activity.nextModules.join(', ')}</div>`
-        : ''}
-      <div class="activity-detail"><small>${new Date(activity.timestamp).toLocaleTimeString()}</small></div>
-    `;
+    this.addDetail(details, 'Reasoning', activity.reasoning || 'N/A');
+    this.addDetail(details, 'Decision', activity.decision || 'N/A');
+    if (activity.nextModules?.length) this.addDetail(details, 'Next', activity.nextModules.join(', '));
+    this.addDetail(details, 'Duration', (activity.durationMs || 0) + 'ms');
+    this.addDetail(details, 'Tokens', activity.tokenUsage?.total_tokens || 0);
+    if (activity.status === 'failed') {
+      actItem.classList.add('failed');
+      this.addDetail(details, 'Module failed', activity.error || 'Analysis unavailable');
+    }
+    this.addDetail(details, 'Time', new Date(activity.timestamp).toLocaleTimeString());
 
     actItem.appendChild(moduleEl);
     actItem.appendChild(details);
@@ -158,15 +258,14 @@ class DigitalBrainUI {
     }, 800);
   }
 
-  displayOrchestrationLog(log) {
+  displayOrchestrationLog(log, success = true) {
     const summary = document.createElement('div');
     summary.className = 'activity-item success';
-    summary.innerHTML = `
-      <div class="activity-module">✅ Orchestration Complete</div>
-      <div class="activity-detail"><strong>Duration:</strong> ${log.duration}ms</div>
-      <div class="activity-detail"><strong>Modules Executed:</strong> ${log.moduleExecutionOrder.length}</div>
-      <div class="activity-detail"><strong>Order:</strong> ${log.moduleExecutionOrder.join(' → ')}</div>
-    `;
+    this.addDetail(summary, 'Orchestration', success ? 'Complete' : 'Blocked');
+    this.addDetail(summary, 'Duration', log.duration + 'ms');
+    this.addDetail(summary, 'Modules executed', log.moduleExecutionOrder.length);
+    this.addDetail(summary, 'Order', log.moduleExecutionOrder.join(' → '));
+    if (log.skippedModules?.length) this.addDetail(summary, 'Skipped', log.skippedModules.join(', '));
     this.activityLog.appendChild(summary);
     this.activityLog.scrollTop = this.activityLog.scrollHeight;
   }
@@ -176,7 +275,7 @@ class DigitalBrainUI {
       const response = await fetch('/api/chat/status');
       const data = await response.json();
 
-      this.moduleList.innerHTML = '';
+      this.moduleList.replaceChildren();
       data.modules.forEach(module => {
         const badge = document.createElement('div');
         badge.className = 'module-badge';
@@ -189,18 +288,21 @@ class DigitalBrainUI {
   }
 
   async clearHistory() {
-    if (this.isWaitingForResponse) return;
-    if (confirm('Clear all chat history and activity logs?')) {
+    if (this.isWaitingForResponse || this.sessionBusy || !this.sessionId) return;
+    if (confirm('Clear this conversation and its saved memory?')) {
+      this.sessionBusy = true;
+      this.setBusy(true);
       try {
-        await fetch('/api/chat/clear', { method: 'POST' });
-        this.chatMessages.innerHTML = '';
-        this.activityLog.innerHTML = '';
+        const response = await fetch('/api/chat/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: this.sessionId }) });
+        if (!response.ok) throw new Error('Unable to clear conversation');
+        this.chatMessages.replaceChildren();
+        this.activityLog.replaceChildren();
         this.totalTokens = 0;
         this.tokenCount.textContent = '0';
         this.addChatMessage('System: Conversation history cleared', 'system');
       } catch (error) {
-        console.error('Failed to clear history:', error);
-      }
+        this.addChatMessage(error.message, 'system');
+      } finally { this.sessionBusy = false; this.setBusy(false); }
     }
   }
 }
@@ -209,9 +311,4 @@ class DigitalBrainUI {
 document.addEventListener('DOMContentLoaded', () => {
   const ui = new DigitalBrainUI();
   
-  // Add welcome message
-  ui.addChatMessage(
-    '🧠 Welcome to the Digital Brain! I am a modular AI system powered by Azure OpenAI. Each component of my architecture specializes in different aspects of reasoning. Ask me anything, and watch how my brain modules process your request in real-time!',
-    'assistant'
-  );
 });

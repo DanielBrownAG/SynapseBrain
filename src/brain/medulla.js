@@ -19,14 +19,7 @@ Analyze the user input and respond with ONLY a JSON object (no markdown, no extr
     this.log('Safety check initiated', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const safety = JSON.parse(parsed);
+      const safety = await this.queryJSON(input, context.getHistory());
 
       return this.createOutput(
         `Threat level: ${safety.threatLevel}`,

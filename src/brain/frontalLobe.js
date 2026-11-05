@@ -19,14 +19,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     this.log('Planning module activation', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const plan = JSON.parse(parsed);
+      const plan = await this.queryJSON(input, context.getHistory());
 
       const nextModules = [];
       if (plan.requiresSafetyCheck) nextModules.push('Medulla');

@@ -4,6 +4,11 @@ export class BrainContext {
     this.conversationHistory = conversationHistory;
     this.memory = {};
     this.moduleFindings = new Map();
+    this.moduleErrors = new Map();
+    this.moduleUsage = new Map();
+    this.activities = [];
+    this.reservedTokens = 0;
+    this.maxTokens = 65536;
     this.tokenUsage = {
       prompt: 0,
       completion: 0,
@@ -34,6 +39,8 @@ export class BrainContext {
       module: moduleName,
       responsibility: result.responsibility,
       decision: result.decision,
+      status: result.status || 'ok',
+      ...(result.error ? { error: result.error } : {}),
       output: result.output
     });
   }
@@ -53,6 +60,39 @@ export class BrainContext {
     this.tokenUsage.prompt += usage.prompt_tokens || 0;
     this.tokenUsage.completion += usage.completion_tokens || 0;
     this.tokenUsage.total = this.tokenUsage.prompt + this.tokenUsage.completion;
+    if (this.tokenUsage.total > this.maxTokens) this.stop(new Error('Request token budget exceeded'));
+  }
+
+  recordUsage(name, usage) {
+    const previous = this.moduleUsage.get(name) || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    for (const field of Object.keys(previous)) previous[field] += usage[field] || 0;
+    this.moduleUsage.set(name, previous);
+    this.updateTokenUsage(usage);
+  }
+
+  throwIfStopped() {
+    this.signal?.throwIfAborted();
+    if (this.fatalError) throw this.fatalError;
+  }
+
+  stop(error) {
+    this.fatalError = error;
+    this.abortController?.abort(error);
+  }
+
+  reserveLLM(systemPrompt, userMessage, history) {
+    this.throwIfStopped();
+    // Conservative text estimate plus message overhead. Actual usage replaces reservations.
+    const promptEstimate = Buffer.byteLength(JSON.stringify([systemPrompt, history, userMessage]), 'utf8') + 512;
+    const available = this.maxTokens - this.tokenUsage.total - this.reservedTokens;
+    const outputLimit = Math.min(Number(process.env.AZURE_OPENAI_MAX_OUTPUT_TOKENS || 8192), available - promptEstimate);
+    if (!Number.isInteger(outputLimit) || outputLimit < 1) {
+      this.stop(new Error('Request token budget exhausted before model call'));
+      throw this.fatalError;
+    }
+    const reserved = promptEstimate + outputLimit;
+    this.reservedTokens += reserved;
+    return { outputLimit, release: () => { this.reservedTokens -= reserved; } };
   }
 
   getContext() {

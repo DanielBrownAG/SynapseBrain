@@ -1,3 +1,4 @@
+import { SessionStore } from '../src/services/sessionStore.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -10,6 +11,7 @@ import logger from '../src/utils/logger.js';
 logger.silent = true;
 
 class TestBrain extends BrainOrchestrator {
+  constructor() { super({ store: new SessionStore(null), routingMode: 'all' }); }
   registerAllModules() {
     for (const name of ['Midbrain', 'Medulla', 'FrontalLobe', 'TemporalLobe', 'ParietalLobe',
       'OccipitalLobe', 'LimbicSystem', 'Hippocampus', 'Amygdala', 'Pons', 'Hypothalamus', 'Cerebrum', 'Brainstem']) {
@@ -39,7 +41,7 @@ test('orchestration streams refined plain text, records usage and saves the same
   });
   assert.equal(result.success, true);
   assert.equal(result.response, chunks.join(''));
-  assert.equal(brain.conversationHistory.at(-1).content, result.response);
+  assert.equal(brain.sessions.get('user').history.at(-1).content, result.response);
   assert.equal(result.tokenUsage.total, 10);
   assert.equal(activities.length, 14);
 });
@@ -68,7 +70,7 @@ test('partial stream errors propagate without saving a fallback answer', async t
   });
   const brain = new TestBrain();
   await assert.rejects(brain.orchestrate('Question', 'user', { onChunk() {}, onActivity() {} }), /Stream failed/);
-  assert.deepEqual(brain.conversationHistory, []);
+  assert.deepEqual(brain.sessions.get('user').history, []);
 });
 
 test('blocked requests stream the safety response and skip refinement', async t => {
@@ -84,7 +86,7 @@ test('blocked requests stream the safety response and skip refinement', async t 
 
 test('buffered orchestration still uses JSON refinement', async t => {
   t.mock.method(azureOpenAI, 'chat', async () => ({
-    content: JSON.stringify({ refined: 'Buffered answer', clarity_score: 1, improvements: [] }),
+    content: JSON.stringify({ refined: 'Buffered answer', clarity_score: 1, improvements: [], tone_adjusted: false }),
     tokenUsage: { prompt_tokens: 3, completion_tokens: 4 }
   }));
   const result = await new TestBrain().orchestrate('Question');

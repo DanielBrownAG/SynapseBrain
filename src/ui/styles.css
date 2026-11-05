@@ -57,6 +57,13 @@ body {
     color: white;
 }
 
+.session-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.session-controls select { max-width: 210px; padding: 7px; border: 1px solid #aab; border-radius: 5px; }
+.session-controls label { font-size: 12px; }
+.activity-item.failed { border-left: 4px solid #c0392b; }
+button:disabled, select:disabled { opacity: 0.5; cursor: wait; }
+@media (max-width: 800px) { .header { align-items: flex-start; gap: 12px; flex-direction: column; } }
+
 /* Main Content */
 .main-content {
     display: grid;

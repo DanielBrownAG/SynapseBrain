@@ -19,14 +19,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     this.log('Scanning for threats', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const threat = JSON.parse(parsed);
+      const threat = await this.queryJSON(input, context.getHistory());
 
       return this.createOutput(
         `Threat detected: ${threat.threatDetected}, Type: ${threat.threatType}`,

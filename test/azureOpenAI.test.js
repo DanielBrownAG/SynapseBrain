@@ -99,3 +99,13 @@ test('invalid configuration and incomplete buffered output fail clearly', async 
   delete service.env.AZURE_OPENAI_DEPLOYMENT_ID;
   await assert.rejects(service.chat('System', 'Question'), /DEPLOYMENT_ID/);
 });
+
+test('request budgets lower the output limit on both API modes', async () => {
+  for (const mode of ['responses', 'chat']) {
+    const { service, calls } = fixture(mode === 'responses'
+      ? { status: 'completed', output_text: 'Answer' }
+      : { choices: [{ finish_reason: 'stop', message: { content: 'Answer' } }] }, mode);
+    await service.chat('System', 'Question', [], { maxOutputTokens: 128 });
+    assert.equal(calls[0].params[mode === 'responses' ? 'max_output_tokens' : 'max_completion_tokens'], 128);
+  }
+});

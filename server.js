@@ -27,9 +27,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'src/ui')));
 
-// Set orchestrator to use Socket.IO
-orchestrator.setSocketIO(io);
-
 // Logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`);

@@ -5,15 +5,45 @@ import express from 'express';
 import chatRoutes from '../src/routes/chat.js';
 import orchestrator from '../src/brain/orchestrator.js';
 import logger from '../src/utils/logger.js';
+import { SessionStore } from '../src/services/sessionStore.js';
 
 logger.silent = true;
+
+test('session endpoints create, restore, clear and delete only the selected conversation', async t => {
+  const previous = orchestrator.sessions;
+  orchestrator.sessions = new SessionStore(null);
+  t.after(() => { orchestrator.sessions = previous; });
+  const app = express();
+  app.use(express.json());
+  app.use('/api/chat', chatRoutes);
+  const server = app.listen(0, '127.0.0.1');
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  await once(server, 'listening');
+  const url = `http://127.0.0.1:${server.address().port}/api/chat`;
+  const create = async () => (await (await fetch(`${url}/sessions`, { method: 'POST' })).json()).session;
+  const first = await create();
+  const second = await create();
+  first.history.push({ role: 'user', content: 'First conversation' });
+  second.history.push({ role: 'user', content: 'Second conversation' });
+  orchestrator.sessions.save(first);
+  orchestrator.sessions.save(second);
+  const clear = await fetch(`${url}/clear`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: first.id }) });
+  assert.equal(clear.status, 200);
+  assert.deepEqual(orchestrator.sessions.get(first.id).history, []);
+  const restored = await (await fetch(`${url}/sessions/${second.id}`)).json();
+  assert.equal(restored.session.history[0].content, 'Second conversation');
+  assert.equal((await fetch(`${url}/sessions/${first.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await fetch(`${url}/sessions/${first.id}`)).status, 404);
+  assert.ok(orchestrator.sessions.get(second.id));
+  assert.equal((await fetch(`${url}/clear`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 400);
+});
 
 test('HTTP SSE sends a live chunk before completion, validates input and reports errors', async t => {
   let finish;
   const pending = new Promise(resolve => { finish = resolve; });
   t.mock.method(orchestrator, 'orchestrate', async (message, user, options) => {
     if (message === 'fail') throw new Error('upstream failed');
-    if (!options) return { success: true, response: 'Buffered' };
+    if (!options?.onChunk) return { success: true, response: 'Buffered' };
     options.onChunk('Live');
     await pending;
     return { success: true, response: 'Live' };

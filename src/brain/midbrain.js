@@ -18,15 +18,7 @@ Analyze the user input and respond with ONLY a JSON object (no markdown, no extr
     this.log('Processing input for intent classification', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      // Clean up markdown code blocks if present
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const classification = JSON.parse(parsed);
+      const classification = await this.queryJSON(input, context.getHistory());
 
       return this.createOutput(
         `Classified user intent as: ${classification.intent}`,

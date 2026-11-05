@@ -19,14 +19,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     this.log('Analyzing language and tone', { input: input.substring(0, 50) });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const analysis = JSON.parse(parsed);
+      const analysis = await this.queryJSON(input, context.getHistory());
 
       return this.createOutput(
         `Detected tone: ${analysis.tone}, Complexity: ${analysis.complexity}`,

@@ -1,30 +1,32 @@
 import logger from '../utils/logger.js';
-import activityTracker from '../utils/activityTracker.js';
+import sessionStore from '../services/sessionStore.js';
+import { randomUUID } from 'node:crypto';
 import { BrainContext } from '../utils/context.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 // Import all brain modules
-import Midbrain from './midbrain.js';
-import FrontalLobe from './frontalLobe.js';
-import TemporalLobe from './temporalLobe.js';
-import ParietalLobe from './parietalLobe.js';
-import OccipitalLobe from './occipitalLobe.js';
-import Cerebellum from './cerebellum.js';
-import Brainstem from './brainstem.js';
-import Medulla from './medulla.js';
-import Amygdala from './amygdala.js';
-import Hippocampus from './hippocampus.js';
-import Hypothalamus from './hypothalamus.js';
-import LimbicSystem from './limbicSystem.js';
-import Pons from './pons.js';
-import Cerebrum from './cerebrum.js';
+import { Midbrain } from './midbrain.js';
+import { FrontalLobe } from './frontalLobe.js';
+import { TemporalLobe } from './temporalLobe.js';
+import { ParietalLobe } from './parietalLobe.js';
+import { OccipitalLobe } from './occipitalLobe.js';
+import { Cerebellum } from './cerebellum.js';
+import { Brainstem } from './brainstem.js';
+import { Medulla } from './medulla.js';
+import { Amygdala } from './amygdala.js';
+import { Hippocampus } from './hippocampus.js';
+import { Hypothalamus } from './hypothalamus.js';
+import { LimbicSystem } from './limbicSystem.js';
+import { Pons } from './pons.js';
+import { Cerebrum } from './cerebrum.js';
 
 export class BrainOrchestrator {
-  constructor() {
+  constructor({ store = sessionStore, routingMode = process.env.SYNAPSE_ROUTING_MODE || 'adaptive' } = {}) {
     this.modules = new Map();
     this.registerAllModules();
-    this.conversationHistory = [];
-    this.socketIO = null;
+    this.sessions = store;
+    this.routingMode = routingMode;
+    if (!['adaptive', 'all'].includes(routingMode)) throw new Error('SYNAPSE_ROUTING_MODE must be adaptive or all');
     this.requestContext = new AsyncLocalStorage();
   }
 
@@ -34,20 +36,20 @@ export class BrainOrchestrator {
 
   registerAllModules() {
     const modules = [
-      Midbrain,
-      FrontalLobe,
-      TemporalLobe,
-      ParietalLobe,
-      OccipitalLobe,
-      Cerebellum,
-      Brainstem,
-      Medulla,
-      Amygdala,
-      Hippocampus,
-      Hypothalamus,
-      LimbicSystem,
-      Pons,
-      Cerebrum
+      new Midbrain(),
+      new FrontalLobe(),
+      new TemporalLobe(),
+      new ParietalLobe(),
+      new OccipitalLobe(),
+      new Cerebellum(),
+      new Brainstem(),
+      new Medulla(),
+      new Amygdala(),
+      new Hippocampus(),
+      new Hypothalamus(),
+      new LimbicSystem(),
+      new Pons(),
+      new Cerebrum()
     ];
 
     modules.forEach(module => {
@@ -58,16 +60,6 @@ export class BrainOrchestrator {
     logger.info(`Registered ${modules.length} brain modules`);
   }
 
-  setSocketIO(io) {
-    this.socketIO = io;
-  }
-
-  broadcastActivity(activity) {
-    if (this.socketIO) {
-      this.socketIO.emit('brain-activity', activity);
-    }
-  }
-
   async callModule(moduleName, payload, callerName) {
     const module = this.modules.get(moduleName);
     if (!module) {
@@ -76,181 +68,128 @@ export class BrainOrchestrator {
     }
 
     logger.info(`${callerName} calling ${moduleName}`);
-    this.context.signal?.throwIfAborted();
+    this.context.throwIfStopped();
+    const started = Date.now();
     const result = await module.process(payload, this.context);
-    this.context.signal?.throwIfAborted();
+    this.context.throwIfStopped();
     this.context.recordModuleResult(moduleName, result);
 
     // Log and broadcast
-    const activity = activityTracker.logActivity(moduleName, {
+    const activity = {
+      module: moduleName, sessionId: this.context.userId, requestId: this.context.requestId,
+      timestamp: new Date().toISOString(), durationMs: Date.now() - started,
+      status: result.status || 'ok', error: result.error,
+      tokenUsage: this.context.moduleUsage.get(moduleName) || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       calledBy: callerName,
       input: typeof payload === 'string' ? payload.substring(0, 100) : JSON.stringify(payload).substring(0, 100),
       reasoning: result.reasoning,
       decision: result.decision,
       nextModules: result.nextModules
-    });
+    };
+    this.context.activities.push(activity);
 
     if (this.context.onActivity) this.context.onActivity(activity);
-    else this.broadcastActivity(activity);
+
     return result;
   }
 
-  async orchestrate(userInput, userId = 'default', options = {}) {
-    const context = new BrainContext(userId, [...this.conversationHistory]);
-    Object.assign(context, options);
-    return this.requestContext.run(context, () => this.processInput(userInput, userId));
+  async orchestrate(userInput, sessionId = 'default', options = {}) {
+    return this.sessions.withLock(sessionId, async () => {
+      options.signal?.throwIfAborted();
+      const session = this.sessions.get(sessionId) || this.sessions.create(sessionId);
+      const deadlineMs = Number(process.env.SYNAPSE_REQUEST_TIMEOUT_MS || 120000);
+      const maxTokens = Number(process.env.SYNAPSE_REQUEST_MAX_TOKENS || 65536);
+      if (!Number.isInteger(deadlineMs) || deadlineMs < 1 || !Number.isInteger(maxTokens) || maxTokens < 1) {
+        throw new Error('Invalid request deadline or token budget');
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new Error('Request deadline exceeded')), deadlineMs);
+      const context = new BrainContext(sessionId, session.history.slice(-40));
+      context.memory = structuredClone(session.memory);
+      context.maxTokens = maxTokens;
+      context.moduleUsage = new Map();
+      context.abortController = controller;
+      context.requestId = randomUUID();
+      context.signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+      context.onChunk = options.onChunk;
+      context.onActivity = options.onActivity;
+      try {
+        let result;
+        try {
+          result = await this.requestContext.run(context, () => this.processInput(userInput, sessionId));
+          context.throwIfStopped();
+        } catch (error) {
+          session.activities = context.activities;
+          session.totalTokens += context.tokenUsage.total;
+          this.sessions.save(session);
+          throw error;
+        }
+        if (result.success) {
+          session.history.push({ role: 'user', content: userInput }, { role: 'assistant', content: result.response });
+          session.history = session.history.slice(-200);
+          session.memory = context.memory;
+        }
+        session.activities = context.activities;
+        session.totalTokens += context.tokenUsage.total;
+        this.sessions.save(session);
+        return { ...result, sessionId };
+      } finally { clearTimeout(timer); }
+    });
   }
 
-  async processInput(userInput, userId) {
-    logger.info(`[ORCHESTRATION] Processing input from user: ${userId}`);
-    
-    const orchestrationLog = {
-      startTime: new Date(),
-      userInput: userInput.substring(0, 100),
-      sessionId: activityTracker.getSessionId(),
-      moduleExecutionOrder: [],
-      responses: {}
+  async processInput(userInput, sessionId) {
+    const context = this.context;
+    const log = { startTime: new Date(), sessionId, requestId: context.requestId,
+      moduleExecutionOrder: [], skippedModules: [], responses: {} };
+    const run = async (name, input = userInput) => {
+      const result = await this.callModule(name, input, 'Orchestrator');
+      log.moduleExecutionOrder.push(name);
+      log.responses[name] = result;
+      return result;
+    };
+    const finish = (success, response) => {
+      log.endTime = new Date();
+      log.duration = log.endTime - log.startTime;
+      return { success, response, activities: context.activities, orchestrationLog: log, tokenUsage: context.tokenUsage };
+    };
+    const block = async response => {
+      await context.onChunk?.(response);
+      return finish(false, response);
     };
 
-    try {
-      // Step 1: Midbrain - Quick intent classification
-      logger.info('[ORCHESTRATION] Step 1: Midbrain classification');
-      const midbrainResult = await this.callModule('Midbrain', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Midbrain');
-      orchestrationLog.responses.midbrain = midbrainResult;
+    await run('Midbrain');
+    const safety = await run('Medulla');
+    if (safety.output?.isSafe !== true || ['block', 'escalate'].includes(safety.output?.action)) return block('I cannot process that request. It violates safety guidelines or the safety check could not be completed.');
+    const plan = await run('FrontalLobe');
+    await run('Amygdala');
 
-      // Step 2: Safety check via Medulla
-      logger.info('[ORCHESTRATION] Step 2: Medulla safety check');
-      const medullaResult = await this.callModule('Medulla', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Medulla');
-      orchestrationLog.responses.medulla = medullaResult;
-
-      if (medullaResult.output?.isSafe === false) {
-        logger.warn('[ORCHESTRATION] Safety check failed, blocking response');
-        await this.context.onChunk?.('I cannot process that request. It violates safety guidelines.');
-        return {
-          success: false,
-          response: 'I cannot process that request. It violates safety guidelines.',
-          activities: activityTracker.getActivities(),
-          orchestrationLog
-        };
-      }
-
-      // Step 3: Frontal Lobe - Planning
-      logger.info('[ORCHESTRATION] Step 3: Frontal Lobe planning');
-      const frontalResult = await this.callModule('FrontalLobe', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('FrontalLobe');
-      orchestrationLog.responses.frontal = frontalResult;
-
-      // Step 4: Parallel processing of specialized modules
-      logger.info('[ORCHESTRATION] Step 4: Parallel module processing');
-      const parallelModules = [
-        { name: 'TemporalLobe', payload: userInput },
-        { name: 'ParietalLobe', payload: userInput },
-        { name: 'OccipitalLobe', payload: userInput },
-        { name: 'LimbicSystem', payload: userInput },
-        { name: 'Hippocampus', payload: userInput }
-      ];
-
-      const parallelResults = await Promise.all(
-        parallelModules.map(m => this.callModule(m.name, m.payload, 'Orchestrator'))
-      );
-
-      parallelModules.forEach((m, idx) => {
-        orchestrationLog.moduleExecutionOrder.push(m.name);
-        orchestrationLog.responses[m.name.toLowerCase()] = parallelResults[idx];
-      });
-
-      // Step 5: Amygdala - Threat detection
-      logger.info('[ORCHESTRATION] Step 5: Amygdala threat detection');
-      const amygdalaResult = await this.callModule('Amygdala', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Amygdala');
-      orchestrationLog.responses.amygdala = amygdalaResult;
-
-      // Step 6: Pons - Dialogue management
-      logger.info('[ORCHESTRATION] Step 6: Pons dialogue management');
-      const ponsResult = await this.callModule('Pons', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Pons');
-      orchestrationLog.responses.pons = ponsResult;
-
-      // Step 7: Hypothalamus - System state
-      logger.info('[ORCHESTRATION] Step 7: Hypothalamus system monitoring');
-      const hypothalamusResult = await this.callModule('Hypothalamus', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Hypothalamus');
-      orchestrationLog.responses.hypothalamus = hypothalamusResult;
-
-      // Step 8: Cerebrum - Final synthesis
-      logger.info('[ORCHESTRATION] Step 8: Cerebrum final response generation');
-      const cerebrumResult = await this.callModule('Cerebrum', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Cerebrum');
-      orchestrationLog.responses.cerebrum = cerebrumResult;
-
-      // Step 9: Cerebellum - Output refinement
-      logger.info('[ORCHESTRATION] Step 9: Cerebellum refinement');
-      const refinementResult = await this.callModule(
-        'Cerebellum',
-        cerebrumResult.output?.response || 'Response',
-        'Orchestrator'
-      );
-      orchestrationLog.moduleExecutionOrder.push('Cerebellum');
-      orchestrationLog.responses.cerebellum = refinementResult;
-
-      // Step 10: Brainstem - Final stability check
-      logger.info('[ORCHESTRATION] Step 10: Brainstem final stability check');
-      const brainstemResult = await this.callModule('Brainstem', userInput, 'Orchestrator');
-      orchestrationLog.moduleExecutionOrder.push('Brainstem');
-      orchestrationLog.responses.brainstem = brainstemResult;
-
-      if (!brainstemResult.output?.isStable) {
-        logger.warn('[ORCHESTRATION] System instability detected');
-      }
-
-      // Update conversation history
-      this.conversationHistory.push({
-        role: 'user',
-        content: userInput
-      });
-
-      const finalResponse = refinementResult.output?.refined || cerebrumResult.output?.response;
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: finalResponse
-      });
-
-      orchestrationLog.endTime = new Date();
-      orchestrationLog.duration = orchestrationLog.endTime - orchestrationLog.startTime;
-
-      logger.info(`[ORCHESTRATION] Complete in ${orchestrationLog.duration}ms`);
-
-      return {
-        success: true,
-        response: finalResponse,
-        activities: activityTracker.getActivities(),
-        orchestrationLog,
-        tokenUsage: this.context.tokenUsage
-      };
-    } catch (error) {
-      if (this.context.signal?.aborted || this.context.onChunk) throw error;
-      logger.error('[ORCHESTRATION] Fatal error', { error: error.message });
-      return {
-        success: false,
-        response: 'An unexpected error occurred during processing.',
-        error: error.message,
-        activities: activityTracker.getActivities(),
-        orchestrationLog
-      };
+    const optional = ['TemporalLobe', 'ParietalLobe', 'OccipitalLobe', 'LimbicSystem', 'Hippocampus', 'Pons', 'Hypothalamus'];
+    let selected = optional;
+    if (this.routingMode !== 'all' && plan.status !== 'failed' && Array.isArray(plan.output?.primaryModules)) {
+      const names = new Set(plan.output.primaryModules);
+      if (plan.output.requiresLongTermMemory) names.add('Hippocampus');
+      selected = optional.filter(name => names.has(name));
     }
+    log.skippedModules = optional.filter(name => !selected.includes(name));
+    // A cancelled sibling must not continue after the session lock is released.
+    const results = await Promise.allSettled(selected.map(name => run(name)));
+    const failure = results.find(result => result.status === 'rejected');
+    if (failure) throw failure.reason;
+    context.throwIfStopped();
+
+    const synthesis = await run('Cerebrum');
+    if (synthesis.status === 'failed') throw new Error(synthesis.error || 'Response synthesis failed');
+    const draft = synthesis.output?.response;
+    if (typeof draft !== 'string' || !draft.trim()) throw new Error('Synthesis returned no answer');
+    const stability = await run('Brainstem', draft);
+    if (stability.output?.isStable !== true) return block('The response could not pass the stability check. Please try again.');
+    const refinement = await run('Cerebellum', draft);
+    return finish(true, refinement.output?.refined || draft);
   }
 
-  getModules() {
-    return Array.from(this.modules.keys());
-  }
+  getModules() { return Array.from(this.modules.keys()); }
 
-  clearHistory() {
-    this.conversationHistory = [];
-    activityTracker.clearActivities();
-    logger.info('Conversation history and activities cleared');
-  }
+  async clearHistory(sessionId) { return this.sessions.clear(sessionId); }
 }
 
 export default new BrainOrchestrator();

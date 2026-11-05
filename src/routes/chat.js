@@ -1,13 +1,34 @@
 import express from 'express';
 import orchestrator from '../brain/orchestrator.js';
 import logger from '../utils/logger.js';
+import { randomUUID } from 'node:crypto';
 
 const router = express.Router();
+
+router.post('/sessions', (req, res) => {
+  const session = orchestrator.sessions.create();
+  res.status(201).json({ success: true, session });
+});
+
+router.get('/sessions/:sessionId', (req, res) => {
+  try {
+    const session = orchestrator.sessions.get(req.params.sessionId);
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+    res.json({ success: true, session });
+  } catch (error) { res.status(400).json({ success: false, error: error.message }); }
+});
+
+router.delete('/sessions/:sessionId', async (req, res) => {
+  try {
+    await orchestrator.sessions.delete(req.params.sessionId);
+    res.json({ success: true });
+  } catch (error) { res.status(400).json({ success: false, error: error.message }); }
+});
 
 // Chat endpoint
 router.post('/chat', async (req, res) => {
   try {
-    const { message, userId = 'default' } = req.body;
+    const { message, sessionId = req.body?.userId || randomUUID() } = req.body || {};
 
     if (typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({
@@ -18,24 +39,31 @@ router.post('/chat', async (req, res) => {
 
     logger.info(`Chat request received: ${message.substring(0, 50)}...`);
 
-    const result = await orchestrator.orchestrate(message, userId);
+    try { orchestrator.sessions.validateId(sessionId); }
+    catch (error) { return res.status(400).json({ success: false, error: error.message }); }
+    const controller = new AbortController();
+    res.on('close', () => controller.abort());
+    const result = await orchestrator.orchestrate(message, sessionId, { signal: controller.signal });
 
     res.json(result);
   } catch (error) {
     logger.error('Chat route error', { error: error.message });
-    res.status(500).json({
+    const limited = /^Request (token budget|deadline)/.test(error.message);
+    res.status(limited ? (error.message.includes('deadline') ? 504 : 422) : 500).json({
       success: false,
-      error: 'Internal server error'
+      error: limited ? error.message : 'Internal server error'
     });
   }
 });
 
 // POST /api/chat/stream: model deltas and a final result over SSE.
 router.post('/stream', async (req, res) => {
-  const { message, userId = 'default' } = req.body || {};
+  const { message, sessionId = req.body?.userId || randomUUID() } = req.body || {};
   if (typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ success: false, error: 'Message is required' });
   }
+  try { orchestrator.sessions.validateId(sessionId); }
+  catch (error) { return res.status(400).json({ success: false, error: error.message }); }
   const controller = new AbortController();
   res.on('close', () => controller.abort());
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache',
@@ -49,7 +77,7 @@ router.post('/stream', async (req, res) => {
   }, 15000);
   try {
     send('start', {});
-    const result = await orchestrator.orchestrate(message, userId, {
+    const result = await orchestrator.orchestrate(message, sessionId, {
       signal: controller.signal,
       onChunk: chunk => send('chunk', { chunk }),
       onActivity: activity => send('activity', activity)
@@ -73,9 +101,11 @@ router.get('/status', (req, res) => {
 });
 
 // Clear history endpoint
-router.post('/clear', (req, res) => {
-  orchestrator.clearHistory();
-  res.json({ success: true, message: 'History cleared' });
+router.post('/clear', async (req, res) => {
+  try {
+    await orchestrator.clearHistory(req.body?.sessionId || req.body?.userId);
+    res.json({ success: true, message: 'History cleared' });
+  } catch (error) { res.status(400).json({ success: false, error: error.message }); }
 });
 
 export default router;

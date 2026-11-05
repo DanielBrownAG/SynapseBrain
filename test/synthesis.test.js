@@ -1,3 +1,4 @@
+import { SessionStore } from '../src/services/sessionStore.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BrainOrchestrator } from '../src/brain/orchestrator.js';
@@ -13,6 +14,7 @@ const analysisModules = ['Midbrain', 'Medulla', 'FrontalLobe', 'TemporalLobe',
   'Amygdala', 'Pons', 'Hypothalamus'];
 
 class SynthesisBrain extends BrainOrchestrator {
+  constructor() { super({ store: new SessionStore(null), routingMode: 'all' }); }
   registerAllModules() {
     for (const name of analysisModules) {
       this.modules.set(name, { async process(input) {
@@ -45,7 +47,9 @@ test('Cerebrum receives every completed specialist finding with the original inp
   });
   const brain = new SynthesisBrain();
   const history = [{ role: 'user', content: 'Earlier question' }, { role: 'assistant', content: 'Earlier answer' }];
-  brain.conversationHistory.push(...history);
+  const session = brain.sessions.create('user');
+  session.history.push(...history);
+  brain.sessions.save(session);
   const result = await brain.orchestrate('Original question', 'user', { onActivity() {} });
   assert.equal(result.success, true);
   const { payload, prompt } = requests[0];
@@ -60,7 +64,7 @@ test('Cerebrum receives every completed specialist finding with the original inp
   assert.deepEqual(requests[0].history, history);
   assert.match(prompt, /fallible analysis/);
   assert.equal(result.response, 'Answer using ParietalLobe: Original question');
-  assert.equal(brain.conversationHistory.at(-2).content, 'Original question');
+  assert.equal(brain.sessions.get('user').history.at(-2).content, 'Original question');
   assert.equal(result.tokenUsage.total, 15);
 });
 
@@ -104,5 +108,5 @@ test('Cerebrum can answer with no specialist findings', async t => {
   const query = t.mock.method(azureOpenAI, 'chat', async () => ({ content: 'Answer', tokenUsage: {} }));
   const result = await new Cerebrum().process('Question', new BrainContext('user'));
   assert.equal(result.output.response, 'Answer');
-  assert.deepEqual(JSON.parse(query.mock.calls[0].arguments[1]), { userInput: 'Question', moduleFindings: [] });
+  assert.deepEqual(JSON.parse(query.mock.calls[0].arguments[1]), { userInput: 'Question', memory: {}, moduleFindings: [] });
 });

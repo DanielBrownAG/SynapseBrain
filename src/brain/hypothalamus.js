@@ -20,14 +20,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     });
 
     try {
-      const response = await this.queryLLM(input, context.getHistory());
-      
-      let parsed = response.content;
-      if (parsed.includes('```json')) {
-        parsed = parsed.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const state = JSON.parse(parsed);
+      const state = await this.queryJSON(JSON.stringify({ userInput: input, tokenUsage: context.tokenUsage, maxTokens: context.maxTokens }), context.getHistory());
 
       return this.createOutput(
         `System health: ${state.systemHealth}`,
@@ -39,9 +32,9 @@ Respond with ONLY a JSON object (no markdown, no extra text):
       this.error('System state monitoring failed', { error: error.message });
       return this.createOutput(
         'Monitoring error',
-        'System assumed healthy',
+        'System health unknown',
         [],
-        { systemHealth: 'good', tokenBudgetStatus: 'normal' }
+        { systemHealth: 'warning', tokenBudgetStatus: 'warning' }
       );
     }
   }
