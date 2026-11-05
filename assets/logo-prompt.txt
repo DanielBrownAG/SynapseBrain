@@ -1,0 +1,3 @@
+Generated using the built-in imagegen tool.
+
+Use case: logo-brand. Create a polished original logo image for the open-source project SynapseBrain, a modular AI reasoning orchestrator. A distinctive minimalist brain silhouette built from interconnected synapse nodes and clean circuit-like paths, conveying many specialist modules collaborating. Include the exact wordmark "SynapseBrain" in crisp contemporary readable typography. Professional software identity, balanced horizontal composition, generous clear space, flat vector-like aesthetic suitable for a GitHub README header, legible at small sizes, restrained color accents on a solid neutral background. No slogans, no mockup, no watermark, no extra text.

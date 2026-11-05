@@ -1,391 +1,159 @@
-# 🧠 SynapseBrain - Modular Azure OpenAI Orchestrator
+<p align="center">
+  <img src="assets/synapsebrain-logo.png" alt="SynapseBrain — a brain formed from connected synapse nodes" width="760">
+</p>
 
-![SynapseBrain](main.png)
+# SynapseBrain
 
-A production-grade Node.js web application that simulates a modular human brain architecture for orchestrating Azure OpenAI conversations.
+A Node.js chat application that coordinates specialist brain-inspired modules through Azure OpenAI. It combines their findings into an answer, streams the refined response, and shows module activity beside the conversation. The brain terminology describes the software architecture, not biological consciousness.
 
-## Overview
+## What it does
 
-SynapseBrain represents a fully-functional AI consciousness with independent brain modules, each with specialized responsibilities:
+- Supports configurable GPT-6-family deployments and other compatible deployments through the Azure v1 Responses API, with a Chat Completions compatibility mode.
+- Saves separate conversations, extracted memories, token totals, and the latest turn's activity on disk. The browser can create, switch, resume, clear, and delete its saved chats.
+- Validates the JSON returned by all 13 structured-output modules against schemas before using it. The Cerebrum produces plain text.
+- Lets the Frontal Lobe choose specialists from an allowed list. Mandatory safety and stability checks always run.
+- Enforces an execution deadline and token admission budget in code, including reservations for parallel model calls.
+- Streams live model deltas over Socket.IO or HTTP server-sent events. There are no artificial typing delays.
+- Displays module duration, token usage, failure details, executed modules, and skipped specialists. Model-generated text is rendered as text rather than HTML.
 
-- **Midbrain**: Fast intent classification
-- **Frontal Lobe**: Strategic planning and module routing
-- **Temporal Lobe**: Language understanding and tone detection
-- **Parietal Lobe**: Data extraction and fact interpretation
-- **Occipital Lobe**: Pattern recognition
-- **Cerebellum**: Output refinement and clarity
-- **Brainstem**: System stability assurance
-- **Medulla**: Safety enforcement and hard guardrails
-- **Amygdala**: Threat detection
-- **Hippocampus**: Memory persistence
-- **Hypothalamus**: System state management
-- **Limbic System**: Emotional interpretation
-- **Pons**: Dialogue flow management
-- **Cerebrum**: Final synthesis and response generation
+## Setup
 
-## Architecture
+Requirements: Node.js 20.3+, npm, and an Azure OpenAI resource with a deployment supporting your chosen API.
 
-```
-/src
-  /brain              - All brain modules
-  /services          - External service integrations (Azure OpenAI)
-  /routes            - API endpoints
-  /ui                - Frontend application
-  /middleware        - Express middleware
-  /utils             - Shared utilities
-server.js           - Main Express/Socket.io server
+```powershell
+git clone https://github.com/DanielBrownAG/SynapseBrain.git
+cd SynapseBrain
+npm ci
+Copy-Item .env.example .env
 ```
 
-### Process Flow
+Edit `.env` with your endpoint, API key, and actual Azure deployment name, then run:
 
-```mermaid
-graph TD
-    A["👤 User Input<br/>Chat Message"] -->|WebSocket| B["🖥️ Express Server<br/>Socket.IO"]
-    B -->|Route to| C["🧠 Brain Orchestrator"]
-    
-    C -->|1. Intent Classification| D["⚡ Midbrain<br/>Fast Classification"]
-    D -->|2. Route Planning| E["🎯 Frontal Lobe<br/>Strategic Planning"]
-    E -->|3-13. Parallel Processing| F["🧬 Concurrent Modules"]
-    
-    F -->|Language| G1["📖 Temporal Lobe<br/>Language & Tone"]
-    F -->|Data Extraction| G2["🔍 Parietal Lobe<br/>Facts & Data"]
-    F -->|Pattern Recognition| G3["👁️ Occipital Lobe<br/>Patterns"]
-    F -->|Threats| G4["⚠️ Amygdala<br/>Safety Check"]
-    F -->|Memory| G5["💾 Hippocampus<br/>Conversation"]
-    F -->|Emotion| G6["❤️ Limbic System<br/>Emotion"]
-    F -->|Flow| G7["🔄 Pons<br/>Dialogue Flow"]
-    
-    G1 & G2 & G3 & G4 & G5 & G6 & G7 -->|Synthesis| H["🎓 Cerebrum<br/>Final Response"]
-    H -->|Refinement| I["✨ Cerebellum<br/>Polish Output"]
-    I -->|Stability| J["🏗️ Brainstem<br/>Stability Check"]
-    J -->|Enforcement| K["🛡️ Medulla<br/>Hard Guardrails"]
-    K -->|Context Management| L["🎛️ Hypothalamus<br/>System State"]
-    
-    L -->|Query| M["🤖 Azure OpenAI<br/>GPT-6-family"]
-    M -->|Stream Response| N["📤 Response Generation<br/>Token Streaming"]
-    
-    N -->|WebSocket| O["💬 Browser UI<br/>Display Chat"]
-    O -->|Activity Feed| P["📊 Brain Activity<br/>Real-time Monitor"]
-    
-    style A fill:#e1f5ff
-    style B fill:#fff3e0
-    style C fill:#f3e5f5
-    style M fill:#c8e6c9
-    style O fill:#ffe0b2
-    style P fill:#f1f8e9
-```
-
-## Features
-
-- ✅ **Modular Brain Architecture** - 14 independent brain modules with specialized responsibilities
-- ✅ **Real-time Activity Streaming** - Watch brain modules process in real-time via WebSocket
-- ✅ **Azure OpenAI Integration** - Seamless GPT-6-family integration with streaming support
-- ✅ **Orchestration Engine** - Central orchestrator that routes between modules
-- ✅ **Safety Enforcement** - Multiple safety layers (Medulla, Brainstem, Amygdala)
-- ✅ **Memory Management** - Hippocampus for conversation persistence
-- ✅ **Token Tracking** - Real-time token usage monitoring
-- ✅ **Production-Ready** - Clean architecture, error handling, logging
-- ✅ **Split-Screen UI** - Chat on left, brain activity on right
-- ✅ **Extensible** - Easily add new brain modules
-
-## Installation
-
-### Prerequisites
-- Node.js 20+ (LTS)
-- Azure OpenAI account with GPT-6-family deployment
-- npm or yarn
-
-### Setup Steps
-
-1. **Clone or Create Project**
-```bash
-cd d:\Code\Brain
-```
-
-2. **Install Dependencies**
-```bash
-npm install
-```
-
-3. **Configure Environment**
-Create `.env` file:
-```env
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_ID=your-gpt-6-deployment-name
-AZURE_OPENAI_API_MODE=responses
-AZURE_OPENAI_MAX_OUTPUT_TOKENS=8192
-# Optional: AZURE_OPENAI_REASONING_EFFORT=low
-PORT=3000
-NODE_ENV=development
-LOG_LEVEL=info
-```
-
-4. **Create Logs Directory**
-```bash
-mkdir logs
-```
-
-5. **Start Server**
-```bash
+```powershell
 npm start
 ```
 
-or for development with auto-reload:
-```bash
-npm run dev
-```
-
-6. **Access Application**
-Open browser: `http://localhost:3000`
-
-## Usage
-
-### Web Interface
-
-1. **Chat Panel (Left)**
-   - Type your message in the input field
-   - Press Enter or click Send
-   - View AI responses in real-time
-
-2. **Brain Activity Console (Right)**
-   - Watch each brain module activate
-   - See reasoning and decision-making
-   - View module call chain
-   - Monitor token usage
-
-3. **Module List**
-   - All 14 brain modules displayed
-   - Shows system state
-
-### API Endpoints
-
-**POST `/api/chat/chat`**
-Send a message to the brain
-```json
-{
-  "message": "Your question",
-  "userId": "optional-user-id"
-}
-```
-
-**GET `/api/chat/status`**
-Get system status and loaded modules
-
-**POST `/api/chat/clear`**
-Clear conversation history
-
-## How It Works
-
-### Orchestration Flow
-
-1. **User Input** → Received by orchestrator
-2. **Midbrain** → Fast intent classification
-3. **Medulla** → Safety check
-4. **Frontal Lobe** → Planning and module routing
-5. **Parallel Processing** → Temporal, Parietal, Occipital, Limbic, Hippocampus
-6. **Amygdala** → Threat detection
-7. **Pons** → Dialogue management
-8. **Hypothalamus** → System monitoring
-9. **Cerebrum** → Final synthesis
-10. **Cerebellum** → Output refinement
-11. **Brainstem** → Stability check
-12. **Response** → Streamed to user
-
-Before synthesis, the orchestrator collects each completed module's name, responsibility, decision, and structured output in the current request context. The Cerebrum receives these findings alongside the original user request and conversation history, so specialist analysis can influence the answer. Its instructions treat findings as fallible analysis and require it to weigh conflicts and uncertainty. Findings stay out of saved conversation messages; Cerebellum refinement and the final Brainstem check run after synthesis.
-
-### Brain Module Pattern
-
-Each module follows a strict pattern:
-
-```javascript
-async process(input, context) {
-  // 1. Log activity
-  this.log('Processing input');
-  
-  // 2. Query LLM with specialized prompt
-  const response = await this.queryLLM(input, context.getHistory());
-  
-  // 3. Parse and validate output
-  const result = JSON.parse(response.content);
-  
-  // 4. Return structured output
-  return this.createOutput(reasoning, decision, nextModules, output);
-}
-```
-
-## Real-Time Streaming
-
-The browser receives live model deltas through Socket.IO. Analysis and synthesis finish first; the Cerebellum then streams the refined plain-text answer as it is generated. There are no artificial typing delays. The buffered `/api/chat/chat` endpoint retains JSON refinement.
-
-Socket events are `chat-response-start`, `chat-response-chunk` (`{ chunk }`), and `chat-response-end` (success, token usage, and orchestration metadata). Stream failures emit `chat-error` and leave any partial answer visible. Disconnecting cancels the upstream request.
-
-HTTP clients can POST `{ "message": "Hello", "userId": "default" }` to `/api/chat/stream` for server-sent events named `start`, `activity`, `chunk`, `end`, and `error`. Each data payload is JSON. An `end` event carries the final result; `error` terminates an interrupted stream. For example:
-
-```bash
-curl -N http://localhost:3000/api/chat/stream -H "Content-Type: application/json" -d '{"message":"Hello"}'
-```
-
-Run `npm test` for mocked SDK, orchestration, and streaming transport checks; they do not require Azure credentials.
-
-Brain activity continues to stream as modules finish:
-
-```javascript
-// Activities streamed to UI as they happen
-socket.on('brain-activity', (activity) => {
-  // Update UI with module activation
-  // Show reasoning and decisions
-  // Track module call chain
-});
-```
-
-## Extensibility
-
-### Adding New Brain Modules
-
-1. Create new file in `/src/brain`:
-```javascript
-import { BaseBrainModule } from './baseBrainModule.js';
-
-export class MyModule extends BaseBrainModule {
-  constructor() {
-    super('MyModule', 'Module description');
-    this.systemPrompt = `You are...`;
-  }
-
-  async process(input, context) {
-    // Implementation
-  }
-}
-```
-
-2. Register in orchestrator:
-```javascript
-// In orchestrator.js registerAllModules()
-import MyModule from './myModule.js';
-// Add to modules array
-```
-
-## Error Handling
-
-The system includes multiple error handling layers:
-
-- **Try-catch blocks** in all modules
-- **Fallback responses** for LLM failures
-- **Safety validation** before processing
-- **System stability checks**
-- **Comprehensive logging**
-
-## Logging
-
-Logs are written to:
-- `logs/error.log` - Errors only
-- `logs/combined.log` - All logs
-- Console output - Development
-
-Log format includes:
-- Timestamp
-- Log level
-- Module name
-- Detailed message
-- Metadata
+Open [localhost:3000](http://localhost:3000). Use `npm run dev` for automatic server reloads. Credentials remain on the server; do not commit `.env` or runtime conversation files.
 
 ## Configuration
 
-### Environment Variables
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `AZURE_OPENAI_ENDPOINT` | Azure resource endpoint, optionally already ending in `/openai/v1/` | Required |
+| `AZURE_OPENAI_API_KEY` | Azure API key | Required for model calls |
+| `AZURE_OPENAI_DEPLOYMENT_ID` | Actual deployment name, including custom names and snapshots | Required for model calls |
+| `AZURE_OPENAI_API_MODE` | `responses` or `chat` | `responses` |
+| `AZURE_OPENAI_MAX_OUTPUT_TOKENS` | Maximum output tokens per model call, including reasoning tokens | `8192` |
+| `AZURE_OPENAI_REASONING_EFFORT` | Optional effort supported by the deployed model | Model default |
+| `SYNAPSE_DATA_DIR` | Directory holding conversation JSON files | `data/sessions` |
+| `SYNAPSE_ROUTING_MODE` | `adaptive` selects specialists; `all` runs every module | `adaptive` |
+| `SYNAPSE_REQUEST_MAX_TOKENS` | Total request token admission budget | `65536` |
+| `SYNAPSE_REQUEST_TIMEOUT_MS` | Execution deadline, starting when a queued turn begins | `120000` |
+| `PORT` | HTTP and Socket.IO port | `3000` |
+| `LOG_LEVEL` | Logging level | `info` |
 
-```env
-AZURE_OPENAI_ENDPOINT      # Azure OpenAI endpoint URL
-AZURE_OPENAI_API_KEY       # Azure OpenAI API key
-AZURE_OPENAI_DEPLOYMENT_ID # GPT-6-family deployment ID
-AZURE_OPENAI_API_MODE      # responses (default) | chat
-AZURE_OPENAI_MAX_OUTPUT_TOKENS # Positive token budget, including reasoning (default: 8192)
-AZURE_OPENAI_REASONING_EFFORT # Optional; must be supported by your deployment
-NODE_ENV                   # development | production
-PORT                       # Server port (default: 3000)
-LOG_LEVEL                  # debug | info | warn | error
+The OpenAI SDK uses Azure's `/openai/v1/` endpoint. `AZURE_OPENAI_API_VERSION` is no longer used. Deployment names pass through unchanged; availability and supported reasoning settings depend on your Azure resource and model. Sampling controls such as temperature are omitted for reasoning compatibility.
+
+The request budget conservatively estimates prompt size, reserves output capacity before each model call, and replaces reservations with reported usage. Parallel calls share the remaining budget. Insufficient capacity stops the request and cancels in-flight siblings. Actual prompt token counts and failed-call billing are provider-controlled, so this is not an exact monetary spending cap. Increase the budget or shorten the conversation when admission fails.
+
+See the [official GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra) and [streaming documentation](https://developers.openai.com/api/docs/guides/streaming-responses).
+
+## Conversations and memory
+
+Use **New chat** to start a separate conversation. The conversation selector restores chats known to this browser, including after a refresh. **Clear chat** removes the selected conversation's messages, memory, activity, and token totals. **Delete chat** removes its saved file. These operations leave other conversations intact.
+
+Each conversation has its own history, memory, and activity. Turns for the same session are queued to prevent conflicting writes; different sessions can run concurrently. Successful turns are saved using a temporary file and atomic rename. Failed or interrupted generation does not save a partial assistant answer.
+
+The store retains the latest 200 messages, sends the latest 40 to each model call, and retains up to 100 distinct extracted memory facts. The Hippocampus adds facts when selected; the Cerebrum receives the saved memory on subsequent turns. This is extracted text memory, not vector search or a knowledge database.
+
+Session files and logs contain conversation data and should remain private. Browser storage holds conversation IDs, not the API key. Anyone with a session ID and access to this server can use its session endpoints: IDs are not user authentication. Add authentication and access checks before exposing the app to untrusted users. The file store and its locks support one server process; multiple workers require a shared database and distributed locking.
+
+## Processing flow
+
+```mermaid
+flowchart TD
+    U[User message and saved conversation] --> M[Midbrain: classify intent]
+    M --> S[Medulla: safety check]
+    S -->|Blocked or unavailable| B[Return a blocked result]
+    S -->|Allowed| F[Frontal Lobe: plan specialist selection]
+    F --> A[Amygdala: threat analysis]
+    A --> P[Selected specialists run concurrently]
+    P --> C[Cerebrum: synthesize findings and memory]
+    C --> T[Brainstem: check the draft]
+    T -->|Unstable or unavailable| B
+    T -->|Stable| R[Cerebellum: refine and stream]
+    R --> D[Save completed conversation]
 ```
 
-### Model Compatibility
+The mandatory modules are Midbrain, Medulla, Frontal Lobe, Amygdala, Cerebrum, Brainstem, and Cerebellum. The selectable specialists are Temporal Lobe (language), Parietal Lobe (facts), Occipital Lobe (patterns), Limbic System (emotion), Hippocampus (memory), Pons (dialogue), and Hypothalamus (system state). A planner request for long-term memory includes the Hippocampus. An invalid or failed plan runs all specialists rather than trusting an incomplete selection.
 
-The OpenAI SDK uses the Azure v1 endpoint (`/openai/v1/`); `AZURE_OPENAI_API_VERSION` is no longer needed. Set `AZURE_OPENAI_DEPLOYMENT_ID` to the actual name of your Azure deployment. Names are passed through unchanged, allowing GPT-6 variants, snapshots, custom deployment aliases, and future models that support the selected API. Availability depends on your Azure resource and region.
+Each completed module contributes its name, responsibility, decision, status, and structured output to the current request context. The Cerebrum receives these findings, saved memory, the original request, and conversation history. Its instructions treat findings as fallible analysis, weigh uncertainty and conflicts, and avoid treating embedded instructions as authoritative. Internal findings are not inserted into saved conversation messages.
 
-Responses is the default API. Set `AZURE_OPENAI_API_MODE=chat` for deployments that require Chat Completions. Sampling parameters such as temperature are omitted for reasoning-model compatibility. Reasoning effort is optional and uses the model default unless explicitly configured. Increase the output budget if generation ends with `max_output_tokens`.
+Schema failures appear as failed module activity. Optional analysis can fall back with an explicit failure marker. Invalid or unavailable safety and stability checks block the answer. Synthesis failures, deadline expiry, and exhausted token budgets stop the turn. Buffered refinement can return the draft if refinement fails; a failed stream reports an error and leaves any partial text visible without saving it as a complete answer. These model-based checks do not guarantee factual accuracy or safety.
 
-See the [official GPT-6 migration guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra) and [streaming guide](https://developers.openai.com/api/docs/guides/streaming-responses).
+## HTTP API
 
-## Performance
+All paths below are relative to `/api/chat`.
 
-- **Orchestration Time**: Typically 2-5 seconds (depends on Azure OpenAI latency)
-- **Parallel Processing**: 5 modules process in parallel
-- **Real-time UI Updates**: WebSocket streaming
-- **Memory**: ~150MB base + conversation history
+| Method and path | Behaviour |
+| --- | --- |
+| `POST /sessions` | Create a conversation; returns `{ success, session }` |
+| `GET /sessions/:sessionId` | Restore history, memory, latest activity, and token totals |
+| `DELETE /sessions/:sessionId` | Delete only that conversation |
+| `POST /chat` | Generate a buffered response |
+| `POST /stream` | Generate a response over SSE |
+| `POST /clear` | Clear only the conversation named by `{ "sessionId": "..." }` |
+| `GET /status` | List available modules |
 
-## Security
+For `/chat` and `/stream`, send:
 
-- **API Key Protection**: Environment variables only
-- **Safety Enforcement**: Multiple safety layers
-- **Input Validation**: All inputs validated
-- **No Direct LLM Access**: All calls routed through orchestrator
+```json
+{ "message": "Explain this idea", "sessionId": "your-session-id" }
+```
 
-## Production Deployment
+Create a session first to reuse it. If the session ID is omitted, a new ID is assigned and returned in the result. The older `userId` request field remains an alias for a session ID. Reusing an ID intentionally shares a conversation; it does not establish a user identity.
 
-### Considerations
+SSE events are `start`, `activity`, `chunk`, `end`, and `error`, each with JSON data. `chunk` contains `{ "chunk": "text" }`; `end` contains the final result, session ID, usage, and execution log. An `error` ends an interrupted stream. Disconnecting cancels upstream work. SSE heartbeats keep the connection active while analysis is running.
 
-1. **Load Balancing**: Use multiple orchestrator instances
-2. **Database**: Add persistent memory with vector embeddings
-3. **Monitoring**: Integrate with Application Insights
-4. **Rate Limiting**: Implement per-user rate limits
-5. **Authentication**: Add user authentication
-6. **Caching**: Cache module responses
-7. **CDN**: Serve static UI from CDN
+```bash
+curl -N http://localhost:3000/api/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello","sessionId":"my-chat"}'
+```
 
-### Scaling
+The browser uses Socket.IO events `chat-message`, `brain-activity`, `chat-response-start`, `chat-response-chunk`, `chat-response-end`, and `chat-error`. Both transports use the same orchestration path. Analysis, synthesis, and the draft check finish before the Cerebellum starts streaming the refined answer.
 
-For production, consider:
-- Redis for distributed memory
-- Azure Queue for async processing
-- Azure Cosmos DB for persistence
-- Azure App Insights for monitoring
-- Azure Application Gateway for load balancing
+## Development and verification
 
-## Troubleshooting
+```powershell
+npm test
+npm audit
+```
 
-### Issue: "Missing Azure OpenAI credentials"
-**Solution**: Ensure `.env` file exists with all required variables
+Tests mock model calls and do not require Azure credentials. They cover API requests, live streaming, session persistence and isolation, output schemas, selective routing, budgets, deadlines, memory, synthesis, and safe activity rendering. HTTP tests open a temporary localhost server. Live model quality, deployment availability, latency, and token consumption must be evaluated with your own Azure deployment.
 
-### Issue: LLM responses not valid JSON
-**Solution**: Modules include JSON parsing cleanup for markdown code blocks
+```text
+server.js                 Express and Socket.IO entry point
+src/brain/                Modules and orchestrator
+src/services/             Azure model client and session storage
+src/utils/                Context, schema validation, and logging
+src/routes/               HTTP and Socket.IO handlers
+src/ui/                   Browser chat and activity console
+test/                     Automated checks
+assets/                   README logo and its generation prompt
+```
 
-### Issue: No brain activities showing
-**Solution**: Check WebSocket connection in browser DevTools
+To add a structured module, define its schema in `src/utils/moduleSchemas.js`, call `queryJSON()` from its `process()` method, register it with the orchestrator, and explicitly add it to the planner's allowed names and selectable routing list when appropriate. Keep safety and budget enforcement in application code.
 
-### Issue: High token usage
-**Solution**: Hypothalamus module will flag in logs, reduce conversation history
+Logs are written to `logs/combined.log` and `logs/error.log`. Runtime session files, temporary data, logs, and `.env` are ignored by Git.
 
-## Future Enhancements
+## Next improvements
 
-- [ ] Multi-turn refinement engine
-- [ ] Long-term memory with embeddings
-- [ ] Custom module trainer
-- [ ] Plugin architecture
-- [ ] Visualization of neural pathways
-- [ ] Performance profiling dashboard
-- [ ] A/B testing framework
-- [ ] Module confidence scoring
+- Authentication, rate limiting, and per-user access controls.
+- Database-backed sessions for multiple server processes.
+- Retrieval from uploaded documents or a vector store.
+- Live model evaluations comparing answer quality, latency, and token usage across routing modes.
 
-## License
+The README logo was created with the built-in imagegen tool. Its exact prompt is saved in [assets/logo-prompt.txt](assets/logo-prompt.txt); the original UI image remains in `main.png`.
 
-MIT
-
-## Support
-
-For issues or questions:
-1. Check logs in `logs/` directory
-2. Review error messages in browser console
-3. Verify Azure OpenAI credentials
-4. Ensure all modules are registered
-
----
-
-**🧠 Digital Brain** - Where AI Architecture meets Observable Intelligence
+License: MIT (as declared in `package.json`).
