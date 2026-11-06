@@ -24,7 +24,8 @@ function badge(label, value, color) {
 if (!checking) mkdirSync(new URL('assets/badges/', root), { recursive: true });
 for (const [name, contents] of [
   ['node', badge('Node.js', pkg.engines.node, '#287a28')],
-  ['version', badge('version', `v${pkg.version}`, '#007ec6')]
+  ['version', badge('version', `v${pkg.version}`, '#007ec6')],
+  ['license', badge('license', pkg.license, '#007ec6')]
 ]) {
   const target = new URL(`assets/badges/${name}.svg`, root);
   if (checking) {

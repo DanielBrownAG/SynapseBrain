@@ -4,6 +4,7 @@
 
 [![Node.js version requirement](assets/badges/node.svg)](https://nodejs.org/)
 [![Version](assets/badges/version.svg)](package.json)
+[![License: MIT](assets/badges/license.svg)](LICENSE)
 [![Tests](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/tests.yml)
 [![Dependency audit](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/dependency-audit.yml/badge.svg?branch=main)](https://github.com/DanielBrownAG/SynapseBrain/actions/workflows/dependency-audit.yml)
 [![Last commit](https://badgen.net/github/last-commit/DanielBrownAG/SynapseBrain/main)](https://github.com/DanielBrownAG/SynapseBrain/commits/main/)
@@ -140,7 +141,7 @@ Tests mock model calls and do not require Azure credentials. They cover API requ
 
 GitHub Actions runs the tests on Ubuntu and Windows with Node.js 20.3.0, 22, and 24 on pushes to `main` and pull requests targeting `main`. A separate dependency audit checks production and development dependencies on those events and weekly, failing on advisories of low severity or higher. Both workflows can also be started manually from the Actions tab; neither requires Azure credentials.
 
-Node and version badges are hosted in this repository to avoid external image-proxy failures. Run `npm run badges:update` after changing `version` or `engines.node` in `package.json`; CI checks that those badges match. Workflow badges come directly from GitHub, and the live last-commit badge uses Badgen.
+Node, version, and license badges are hosted in this repository to avoid external image-proxy failures. Run `npm run badges:update` after changing `version`, `engines.node`, or `license` in `package.json`; CI checks that those badges match. Workflow badges come directly from GitHub, and the live last-commit badge uses Badgen.
 
 ```text
 server.js                 Express and Socket.IO entry point
@@ -166,4 +167,4 @@ Logs are written to `logs/combined.log` and `logs/error.log`. Runtime session fi
 
 The README logo was created with the built-in imagegen tool. Its exact prompt is saved in [assets/logo-prompt.txt](assets/logo-prompt.txt); the original UI image remains in `main.png`.
 
-License: MIT (as declared in `package.json`).
+Licensed under the [MIT License](LICENSE).
